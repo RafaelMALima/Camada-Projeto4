@@ -27,30 +27,29 @@ serialName = "/dev/ttyACM0"           # Ubuntu (variacao de)
 #serialName = "COM11"                  # Windows(variacao de)
 
 
-def espera_resposta(com1, start_time, tamanho, esperando):
-    while time.process_time() - start_time < 5:
+def espera_resposta(com1, start_time, tamanho, esperando, tempo_espera):
+    while time.process_time() - start_time < tempo_espera:
         if not com1.rx.getIsEmpty():
             rxBuffer , _ = com1.getData(tamanho)
             print(rxBuffer)
             print(esperando)
             if rxBuffer == esperando:
                 print("A mensagem foi enviada com sucesso")
-                return True
+                return True, rxBuffer
             else:
                 print("Erro de interpretacao")
-                com1.disable()
-                return False
+                return False, rxBuffer
     print("Erro de timeout")
-    return False
+    return False, b'\x00'
 
-def handshake(com1, start_time):
+def handshake(com1, start_time, total_packs):
     while(True):
         start_time = time.process_time()
-        txBuffer = b'\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF'
-        print(txBuffer)
+        txBuffer = b'\x11\x00\x00' + total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD'
+        print(np.asarray(txBuffer))
         com1.sendData(np.asarray(txBuffer))
         print("Handshake enviado, esperando resposta")
-        handshake_respondido = espera_resposta(com1, start_time, 14, b'\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF')
+        handshake_respondido, _ = espera_resposta(com1, start_time, 14, b'\x02\x00\x00' +total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD', 5)
         if (handshake_respondido):
             print("Handshake respondido")
             return True
@@ -79,10 +78,8 @@ def divide_pacotes(mensagem):
     
     
 
-def monta_datagrama(payload, payloads, i):
-    header = b'\x02' + len(payload).to_bytes(1, 'big') + len(payloads).to_bytes(1, 'big') +  b'\x05' + b'\x00'*6 #fora de ordem
-    header = b'\x02' + len(payload).to_bytes(1, 'big') + len(payloads).to_bytes(1, 'big') +  i.to_bytes(1, 'big') + b'\x00'*6
-    payload = b'\x00\x00'
+def monta_datagrama_conteudo(payload, payloads, i):
+    header = b'\x03\x00\x00' + len(payloads).to_bytes(1, 'big') +  i.to_bytes(1, 'big') + len(payloads).to_bytes(1, 'big') + b'\x00'*4
     EOP = b'\xAA\xBB\xCC\xDD'
     package = header
     package += payload
@@ -92,12 +89,6 @@ def monta_datagrama(payload, payloads, i):
 def main():
     
 
-    #handshake = x00
-    #handshake acknowledge = x01
-    #conteudo = x02
-    #recebido = x03
-    #final = x04
-    #erro = x05
     print("Iniciou o main")
     #declaramos um objeto do tipo enlace com o nome "com". Essa é a camada inferior à aplicação. Observe que um parametro
     #para declarar esse objeto é o nome da porta.
@@ -106,28 +97,50 @@ def main():
 
     # Ativa comunicacao. Inicia os threads e a comunicação seiral 
     com1.enable()
-    #Se chegamos até aqui, a comunicação foi aberta com sucesso. Faça um print para informar.
-    print(f"{len([0])}")
+    mensagem = [b'\x00']*1000
+    payloads = divide_pacotes(mensagem)
         
     txSize = com1.tx.getStatus()
     
     start_time = time.process_time()
-    ouve_handshake = handshake(com1, start_time)
+    houve_handshake = handshake(com1, start_time, len(payloads))
     print("fim do handshake")
-    mensagem = [b'\x00']*1000
-    if ouve_handshake:
-        print("payloads")
-        payloads = divide_pacotes(mensagem)
-        for i in range(len(payloads)):
-            datagrama = monta_datagrama(payloads[i], payloads, i)
+    cont = 1
+    if houve_handshake:
+        while cont < len(payloads):
+            datagrama = monta_datagrama_conteudo(payloads[cont], payloads, cont)
+            print("mandadatagrama")
             com1.sendData(np.asarray(datagrama))
-            start_time = time.process_time()
-            esperando = b'\x03' + len(payloads[i]).to_bytes(1, 'big') + len(payloads).to_bytes(1, 'big') + i.to_bytes(1, 'big') + b'\x00'*6 + b'\xFF'*4
-            teve_resposta = espera_resposta(com1, start_time, 14, esperando)
-            if not teve_resposta:
-                print("ERRO, COMUNICACAO ENCERRADA PREMATURAMENTE")
-                com1.disable()
-                break
+            timer1 = time.process_time()
+            timer2 = time.process_time()
+            esperando = b'\x04\x00\x00\x00' + i.to_bytes(1, 'big') + b'\x00'*5 + b'\xAA\xBB\xCC\xDD'
+            sends = 1
+            recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
+            while time.process_time() - timer2 < 20:
+                if recebeu_resposta:
+                    cont += 1
+                    break
+                if time.process_time() - timer1 > 5:
+                    timer1 = time.process_time()
+                    recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
+            if not recebeu_resposta:
+                if resposta[:1] == b'\x06':
+                    cont = int.from_bytes(resposta[6:7], 'big')
+                if resposta[:1] == b'\x04':
+                    pass
+                if resposta[:1] == b'\x05':
+                    print('ERRO 5 DO SERVIDOR, ENCERRANDO COMUNICACAO')
+                    com1.disable()
+                if resposta[:1] == b'\x00':
+                    header_fim = b'\x05' + b'\x00'*9
+                    mensagem_encerramento = header_fim + b'\xAA\xBB\xCC\xDD'
+                    com1.sendData(mensagem_encerramento)
+                    print("TIMEOUT CRITICO, ENCERRANDO COMUNICACAO")
+                    com1.disable()
+
+                
+                    
+                
     print("Comunicação encerrada")
     com1.disable()
     #so roda o main quando for executado do terminal ... se for chamado dentro de outro modulo nao roda
