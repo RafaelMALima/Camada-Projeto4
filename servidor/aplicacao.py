@@ -12,7 +12,7 @@ import numpy as np
 #use uma das 3 opcoes para atribuir à variável a porta usada
 #serialName = "/dev/ttyACM0"           # Ubuntu (variacao de)
 #serialName = "/dev/tty.usbmodem1411" # Mac    (variacao de)
-serialName = "COM4"                  # Windows(variacao de)
+serialName = "COM3"                  # Windows(variacao de)
 
 EOP = b'\xAA\xBB\xCC\xDD'
 # número do servidor -> 1
@@ -36,6 +36,7 @@ def main():
         print("Iniciou o main")
         com1 = enlace(serialName)
         com1.enable()
+        com1.rx.clearBuffer()
 
         numero_do_pacote = 0
         dados_recebidos = b''
@@ -43,8 +44,22 @@ def main():
         total_de_pacotes = None
         timer1 = time.process_time()
         timer2 = time.process_time()
+        manda = False
         while (time.process_time() - timer2 < 20):
             while time.process_time() - timer1 < 5:
+                if manda:
+                    manda = False
+                    print(f'numero do pacote: {numero_do_pacote}')
+                    print(f'pacote enviado: {pacote_enviado}')
+                    timer1 = time.process_time()
+                    if pacote_enviado is not None:
+                        com1.sendData(pacote_enviado)
+                    else:
+                        com1.rx.clearBuffer()
+                    if total_de_pacotes is not None and (numero_do_pacote == int.from_bytes(total_de_pacotes, 'big')):
+                        com1.disable()
+                        return f'Transmissão encerrada {dados_recebidos} {len(dados_recebidos)}'
+        
                 if not com1.rx.getIsEmpty():
                     print('iniciando leitura')
                     ultimo_pacote_recebido = int.to_bytes(numero_do_pacote + 1, 1, 'big')
@@ -73,8 +88,8 @@ def main():
                             com1.rx.clearBuffer()
                             break
                         pacote_enviado = monta_pacote(h0=b'\x02', h3=total_de_pacotes, h5=id_do_arquivo)
-                        print(f'pacote enviado {pacote_enviado}')
-                        break
+                        manda = True
+                        continue
                     elif h0 == b'\x03':
                         # conteúdo
                         payload_len = int.from_bytes(h5, 'big')
@@ -91,16 +106,18 @@ def main():
                         timer1 = time.process_time()
                         timer2 = time.process_time()
                         numero_do_pacote += 1
+                        print(f'total de pacotes / núemro do pacote')
                         print(int.from_bytes(total_de_pacotes, 'big'), numero_do_pacote)
-                        break
+                        manda = True
+                        continue
                     elif h0 == b'\x05':
                         # timeout
                         com1.disable()
                         return 'Erro de timeout'
                     com1.rx.clearBuffer()
             else:
-                print(numero_do_pacote)
-                print(pacote_enviado)
+                print(f'numero do pacote: {numero_do_pacote}')
+                print(f'pacote enviado: {pacote_enviado}')
                 timer1 = time.process_time()
                 if pacote_enviado is not None:
                     com1.sendData(pacote_enviado)
