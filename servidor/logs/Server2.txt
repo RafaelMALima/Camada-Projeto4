@@ -1,0 +1,21 @@
+Fri Sep 23 16:53:39 2022 / receb / 1 / 14
+Fri Sep 23 16:53:39 2022 / envio / 2 / 14
+Fri Sep 23 16:53:41 2022 / envio / 6 / 128
+Fri Sep 23 16:53:42 2022 / receb / 3 / 128 / 1 / 9
+Fri Sep 23 16:53:42 2022 / envio / 4 / 128
+Fri Sep 23 16:53:44 2022 / receb / 3 / 128 / 2 / 9
+Fri Sep 23 16:53:44 2022 / envio / 4 / 128
+Fri Sep 23 16:53:45 2022 / receb / 3 / 128 / 3 / 9
+Fri Sep 23 16:53:45 2022 / envio / 4 / 128
+Fri Sep 23 16:53:45 2022 / receb / 3 / 128 / 4 / 9
+Fri Sep 23 16:53:46 2022 / envio / 4 / 128
+Fri Sep 23 16:53:47 2022 / receb / 3 / 128 / 5 / 9
+Fri Sep 23 16:53:47 2022 / envio / 4 / 128
+Fri Sep 23 16:53:48 2022 / receb / 3 / 128 / 6 / 9
+Fri Sep 23 16:53:48 2022 / envio / 4 / 128
+Fri Sep 23 16:53:49 2022 / receb / 3 / 128 / 7 / 9
+Fri Sep 23 16:53:49 2022 / envio / 4 / 128
+Fri Sep 23 16:53:51 2022 / receb / 3 / 128 / 8 / 9
+Fri Sep 23 16:53:51 2022 / envio / 4 / 128
+Fri Sep 23 16:53:52 2022 / receb / 3 / 102 / 9 / 9
+Fri Sep 23 16:53:52 2022 / envio / 4 / 102

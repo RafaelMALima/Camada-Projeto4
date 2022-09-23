@@ -52,6 +52,13 @@ def main():
                     timer1 = time.process_time()
                     if pacote_enviado is not None:
                         com1.sendData(pacote_enviado)
+                        with open('logs/Server4.txt', 'a') as f:
+                            if int.from_bytes(pacote_enviado[0:1], 'big') == 2:
+                                f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {14}\n')
+                            else:
+                                f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {int.from_bytes(h5, "big") + 14}\n')
+
+
                     else:
                         com1.rx.clearBuffer()
                     if total_de_pacotes is not None and (numero_do_pacote == int.from_bytes(total_de_pacotes, 'big')):
@@ -72,10 +79,12 @@ def main():
                     h3 = head[3:4]
                     h4 = head[4:5]
                     h5 = head[5:6]
-                    if ultimo_pacote_recebido != h4:
+                    
+                    if (int.from_bytes(ultimo_pacote_recebido, 'big') != int.from_bytes(h4, 'big')) and (h4 != b'\x00'):
                         # mensagem de erro pacote errado recebido
                         pacote_enviado = monta_pacote(h0=b'\x06', h6=ultimo_pacote_recebido)
-                        pass
+                        manda = True
+                        continue
 
                     if h0 == b'\x11':
                         # handshake
@@ -85,6 +94,10 @@ def main():
                             print('pacote incompleto recebido')
                             com1.rx.clearBuffer()
                             break
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / receb / {1} / {14}\n')
+
+
                         pacote_enviado = monta_pacote(h0=b'\x02', h3=total_de_pacotes, h5=id_do_arquivo)
                         manda = True
                         continue
@@ -105,20 +118,30 @@ def main():
                         timer2 = time.process_time()
                         numero_do_pacote += 1
                         print(f'total de pacotes / núemro do pacote')
-                        print(int.from_bytes(total_de_pacotes, 'big'), numero_do_pacote)
+                        numero_de_pacotes = int.from_bytes(total_de_pacotes, 'big')
+                        print(numero_de_pacotes, numero_do_pacote)
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / receb / {int.from_bytes(h0, "big")} / {int.from_bytes(h5, "big") + 14} / {numero_do_pacote} / {numero_de_pacotes}\n')
+                        
                         manda = True
                         continue
                     elif h0 == b'\x05':
                         # timeout
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {5} / {14}\n')
+
                         com1.disable()
                         return 'Erro de timeout'
                     com1.rx.clearBuffer()
             else:
+                # remanda pacotes
                 print(f'numero do pacote: {numero_do_pacote}')
                 print(f'pacote enviado: {pacote_enviado}')
                 timer1 = time.process_time()
                 if pacote_enviado is not None:
                     com1.sendData(pacote_enviado)
+                    with open('logs/Server4.txt', 'a') as f:
+                        f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {int.from_bytes(h5, "big") + 14}\n')
                 if total_de_pacotes is not None and (numero_do_pacote == int.from_bytes(total_de_pacotes, 'big')):
                     com1.disable()
                     return f'Transmissão encerrada {dados_recebidos} {len(dados_recebidos)}'
