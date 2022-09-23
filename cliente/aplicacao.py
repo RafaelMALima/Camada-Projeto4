@@ -29,10 +29,9 @@ serialName = "/dev/ttyACM0"           # Ubuntu (variacao de)
 
 def espera_resposta(com1, start_time, tamanho, esperando, tempo_espera):
     while time.process_time() - start_time < tempo_espera:
-        
         if not com1.rx.getIsEmpty():
-            com1.rx.clearBuffer()
             rxBuffer , _ = com1.getData(tamanho)
+            com1.rx.clearBuffer()
             print(rxBuffer)
             print(esperando)
             if rxBuffer == esperando:
@@ -91,6 +90,7 @@ def main():
 
     # Ativa comunicacao. Inicia os threads e a comunicação seiral 
     com1.enable()
+    com1.rx.clearBuffer()
     mensagem = [b'\x00']*1000
     payloads = divide_pacotes(mensagem)
         
@@ -109,9 +109,8 @@ def main():
             timer2 = time.process_time()
             esperando = b'\x04\x00\x00'+len(payloads).to_bytes(1,'big') + b'\x00\x00\x00' + cont.to_bytes(1,'big') + b'\x00'*2 +  b'\xAA\xBB\xCC\xDD'
             sends = 1
-            print(datagrama)
             while time.process_time() - timer2 < 20:
-                recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando,5)
+                recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
                 if recebeu_resposta:
                     cont += 1
                     break
