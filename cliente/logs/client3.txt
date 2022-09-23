@@ -1,0 +1,16 @@
+Fri Sep 23 16:39:34 2022/envia/ 1 / 14 
+Fri Sep 23 16:39:35 2022/receb/ 2 / 14 
+Fri Sep 23 16:39:35 2022/envia/ 3 / 128 / 1 / 9
+Fri Sep 23 16:39:36 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:36 2022/envia/ 3 / 128 / 2 / 9
+Fri Sep 23 16:39:37 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:37 2022/envia/ 3 / 128 / 3 / 9
+Fri Sep 23 16:39:38 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:38 2022/envia/ 3 / 128 / 4 / 9
+Fri Sep 23 16:39:40 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:40 2022/envia/ 3 / 128 / 5 / 9
+Fri Sep 23 16:39:41 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:41 2022/envia/ 3 / 128 / 6 / 9
+Fri Sep 23 16:39:42 2022/receb/ 4 / 14 
+Fri Sep 23 16:39:42 2022/envia/ 3 / 128 / 7 / 9
+Fri Sep 23 16:40:02 2022/envia/ 5 / 14 
