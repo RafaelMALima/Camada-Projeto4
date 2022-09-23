@@ -1,7 +1,5 @@
-from webbrowser import get
 from enlace import *
 import time
-import numpy as np
 
 
 # voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
@@ -12,7 +10,7 @@ import numpy as np
 #use uma das 3 opcoes para atribuir à variável a porta usada
 #serialName = "/dev/ttyACM0"           # Ubuntu (variacao de)
 #serialName = "/dev/tty.usbmodem1411" # Mac    (variacao de)
-serialName = "COM4"                  # Windows(variacao de)
+serialName = "COM3"                  # Windows(variacao de)
 
 EOP = b'\xAA\xBB\xCC\xDD'
 # número do servidor -> 1
@@ -36,6 +34,7 @@ def main():
         print("Iniciou o main")
         com1 = enlace(serialName)
         com1.enable()
+        com1.rx.clearBuffer()
 
         numero_do_pacote = 0
         dados_recebidos = b''
@@ -43,8 +42,29 @@ def main():
         total_de_pacotes = None
         timer1 = time.process_time()
         timer2 = time.process_time()
+        manda = False
         while (time.process_time() - timer2 < 20):
             while time.process_time() - timer1 < 5:
+                if manda:
+                    manda = False
+                    print(f'numero do pacote: {numero_do_pacote}')
+                    print(f'pacote enviado: {pacote_enviado}')
+                    timer1 = time.process_time()
+                    if pacote_enviado is not None:
+                        com1.sendData(pacote_enviado)
+                        with open('logs/Server4.txt', 'a') as f:
+                            if int.from_bytes(pacote_enviado[0:1], 'big') == 2:
+                                f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {14}\n')
+                            else:
+                                f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {int.from_bytes(h5, "big") + 14}\n')
+
+
+                    else:
+                        com1.rx.clearBuffer()
+                    if total_de_pacotes is not None and (numero_do_pacote == int.from_bytes(total_de_pacotes, 'big')):
+                        com1.disable()
+                        return f'Transmissão encerrada {dados_recebidos} {len(dados_recebidos)}'
+        
                 if not com1.rx.getIsEmpty():
                     print('iniciando leitura')
                     ultimo_pacote_recebido = int.to_bytes(numero_do_pacote + 1, 1, 'big')
@@ -59,10 +79,12 @@ def main():
                     h3 = head[3:4]
                     h4 = head[4:5]
                     h5 = head[5:6]
-                    if ultimo_pacote_recebido != h4:
+                    
+                    if (int.from_bytes(ultimo_pacote_recebido, 'big') != int.from_bytes(h4, 'big')) and (h4 != b'\x00'):
                         # mensagem de erro pacote errado recebido
                         pacote_enviado = monta_pacote(h0=b'\x06', h6=ultimo_pacote_recebido)
-                        pass
+                        manda = True
+                        continue
 
                     if h0 == b'\x11':
                         # handshake
@@ -72,9 +94,13 @@ def main():
                             print('pacote incompleto recebido')
                             com1.rx.clearBuffer()
                             break
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / receb / {1} / {14}\n')
+
+
                         pacote_enviado = monta_pacote(h0=b'\x02', h3=total_de_pacotes, h5=id_do_arquivo)
-                        print(f'pacote enviado {pacote_enviado}')
-                        break
+                        manda = True
+                        continue
                     elif h0 == b'\x03':
                         # conteúdo
                         payload_len = int.from_bytes(h5, 'big')
@@ -91,19 +117,31 @@ def main():
                         timer1 = time.process_time()
                         timer2 = time.process_time()
                         numero_do_pacote += 1
-                        print(int.from_bytes(total_de_pacotes, 'big'), numero_do_pacote)
-                        break
+                        print(f'total de pacotes / núemro do pacote')
+                        numero_de_pacotes = int.from_bytes(total_de_pacotes, 'big')
+                        print(numero_de_pacotes, numero_do_pacote)
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / receb / {int.from_bytes(h0, "big")} / {int.from_bytes(h5, "big") + 14} / {numero_do_pacote} / {numero_de_pacotes}\n')
+                        
+                        manda = True
+                        continue
                     elif h0 == b'\x05':
                         # timeout
+                        with open('logs/Server4.txt', 'a') as f:
+                            f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {5} / {14}\n')
+
                         com1.disable()
                         return 'Erro de timeout'
                     com1.rx.clearBuffer()
             else:
-                print(numero_do_pacote)
-                print(pacote_enviado)
+                # remanda pacotes
+                print(f'numero do pacote: {numero_do_pacote}')
+                print(f'pacote enviado: {pacote_enviado}')
                 timer1 = time.process_time()
                 if pacote_enviado is not None:
                     com1.sendData(pacote_enviado)
+                    with open('logs/Server4.txt', 'a') as f:
+                        f.write(f'{time.asctime(time.localtime(time.time()))} / envio / {int.from_bytes(pacote_enviado[0:1], "big")} / {int.from_bytes(h5, "big") + 14}\n')
                 if total_de_pacotes is not None and (numero_do_pacote == int.from_bytes(total_de_pacotes, 'big')):
                     com1.disable()
                     return f'Transmissão encerrada {dados_recebidos} {len(dados_recebidos)}'
