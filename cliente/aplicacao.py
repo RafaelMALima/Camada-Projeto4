@@ -31,6 +31,7 @@ def espera_resposta(com1, start_time, tamanho, esperando, tempo_espera):
     while time.process_time() - start_time < tempo_espera:
         if not com1.rx.getIsEmpty():
             rxBuffer , _ = com1.getData(tamanho)
+            com1.rx.clearBuffer()
             print(rxBuffer)
             print(esperando)
             if rxBuffer == esperando:
@@ -38,8 +39,7 @@ def espera_resposta(com1, start_time, tamanho, esperando, tempo_espera):
                 return True, rxBuffer
             else:
                 print("Erro de interpretacao")
-                return False, rxBuffer
-    print("Erro de timeout")
+                return True, rxBuffer
     return False, b'\x00'
 
 def handshake(com1, start_time, total_packs):
@@ -48,38 +48,31 @@ def handshake(com1, start_time, total_packs):
         txBuffer = b'\x11\x00\x00' + total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD'
         print(np.asarray(txBuffer))
         com1.sendData(np.asarray(txBuffer))
+        timer_handshake = time.process_time()
         print("Handshake enviado, esperando resposta")
-        handshake_respondido, _ = espera_resposta(com1, start_time, 14, b'\x02\x00\x00' +total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD', 5)
-        if (handshake_respondido):
+        handshake_respondido, response = espera_resposta(com1, start_time, 14, b'\x02\x00\x00' +total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD', 5)
+        if (handshake_respondido and response == b'\x02\x00\x00' +total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD'):
             print("Handshake respondido")
             return True
-        else:
-            print("Handshake não respondido")
-            while(True):
-                continuar = input("Quer continuar? S/n")
-                if continuar == "S":
-                    break
-                elif continuar == "n":
-                    return False
-                else:
-                    print("Input invalido")
 
 def divide_pacotes(mensagem):
     pacotes = []
     pacote = b''
+    i = 0
     for byte in mensagem:
         if len(pacote) < 114:
             pacote += byte
         else:
             pacotes.append(pacote)
-            pacote = b''
+            pacote = byte
     pacotes.append(pacote)
+    print(i)
     return pacotes
     
     
 
 def monta_datagrama_conteudo(payload, payloads, i):
-    header = b'\x03\x00\x00' + len(payloads).to_bytes(1, 'big') +  i.to_bytes(1, 'big') + len(payloads).to_bytes(1, 'big') + b'\x00'*4
+    header = b'\x03\x00\x00' + len(payloads).to_bytes(1, 'big') +  i.to_bytes(1, 'big') + len(payload).to_bytes(1, 'big') + b'\x00'*4
     EOP = b'\xAA\xBB\xCC\xDD'
     package = header
     package += payload
@@ -97,6 +90,7 @@ def main():
 
     # Ativa comunicacao. Inicia os threads e a comunicação seiral 
     com1.enable()
+    com1.rx.clearBuffer()
     mensagem = [b'\x00']*1000
     payloads = divide_pacotes(mensagem)
         
@@ -107,23 +101,22 @@ def main():
     print("fim do handshake")
     cont = 1
     if houve_handshake:
-        while cont < len(payloads):
-            datagrama = monta_datagrama_conteudo(payloads[cont], payloads, cont)
-            print("mandadatagrama")
+        while cont < len(payloads)+1:
+            datagrama = monta_datagrama_conteudo(payloads[cont - 1], payloads, cont)
+            print(f"datagrama:{datagrama}")
             com1.sendData(np.asarray(datagrama))
             timer1 = time.process_time()
             timer2 = time.process_time()
-            esperando = b'\x04\x00\x00\x00' + i.to_bytes(1, 'big') + b'\x00'*5 + b'\xAA\xBB\xCC\xDD'
+            esperando = b'\x04\x00\x00'+len(payloads).to_bytes(1,'big') + b'\x00\x00\x00' + cont.to_bytes(1,'big') + b'\x00'*2 +  b'\xAA\xBB\xCC\xDD'
             sends = 1
-            recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
             while time.process_time() - timer2 < 20:
+                recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
                 if recebeu_resposta:
                     cont += 1
                     break
                 if time.process_time() - timer1 > 5:
                     timer1 = time.process_time()
-                    recebeu_resposta, resposta = espera_resposta(com1, timer1, 14, esperando, 5)
-            if not recebeu_resposta:
+            if recebeu_resposta:
                 if resposta[:1] == b'\x06':
                     cont = int.from_bytes(resposta[6:7], 'big')
                 if resposta[:1] == b'\x04':
@@ -131,13 +124,14 @@ def main():
                 if resposta[:1] == b'\x05':
                     print('ERRO 5 DO SERVIDOR, ENCERRANDO COMUNICACAO')
                     com1.disable()
-                if resposta[:1] == b'\x00':
-                    header_fim = b'\x05' + b'\x00'*9
-                    mensagem_encerramento = header_fim + b'\xAA\xBB\xCC\xDD'
-                    com1.sendData(mensagem_encerramento)
-                    print("TIMEOUT CRITICO, ENCERRANDO COMUNICACAO")
-                    com1.disable()
-
+                    quit()
+            if recebeu_resposta and resposta[:1] == b'\x00':
+                header_fim = b'\x05' + b'\x00'*9
+                mensagem_encerramento = header_fim + b'\xAA\xBB\xCC\xDD'
+                com1.sendData(mensagem_encerramento)
+                print("TIMEOUT CRITICO, ENCERRANDO COMUNICACAO")
+                com1.disable()
+                quit()
                 
                     
                 
