@@ -1,7 +1,5 @@
-from webbrowser import get
 from enlace import *
 import time
-import numpy as np
 
 
 # voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
