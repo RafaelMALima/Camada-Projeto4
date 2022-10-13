@@ -1,5 +1,8 @@
+from distutils.command.bdist_msi import PyDialog
+from rsa import verify
 from enlace import *
 import time
+import crc
 
 
 # voce deverá descomentar e configurar a porta com através da qual ira fazer comunicaçao
@@ -15,6 +18,8 @@ serialName = "COM3"                  # Windows(variacao de)
 EOP = b'\xAA\xBB\xCC\xDD'
 # número do servidor -> 1
 
+# CRC
+calculadora = crc.CrcCalculator(crc.Crc16.CCITT)
 
 def get_data(com1 : enlace, size):
     if com1.rx.getBufferLen() >= size:
@@ -79,6 +84,8 @@ def main():
                     h3 = head[3:4]
                     h4 = head[4:5]
                     h5 = head[5:6]
+                    h8 = head[8:9]
+                    h9 = head[9:10]
                     
                     if (int.from_bytes(ultimo_pacote_recebido, 'big') != int.from_bytes(h4, 'big')) and (h4 != b'\x00'):
                         # mensagem de erro pacote errado recebido
@@ -106,6 +113,13 @@ def main():
                         payload_len = int.from_bytes(h5, 'big')
                         print(com1.rx.getBufferLen(), 'buffer len')
                         payload = get_data(com1, payload_len)
+
+                        # CRC
+                        expected_checksum = int.from_bytes(h8 + h9, 'big')
+                        if (payload is not None) and (not calculadora.verify_checksum(payload, expected_checksum)):
+                            com1.rx.clearBuffer()
+                            pacote_enviado = monta_pacote(h0=b'\x06', h3=total_de_pacotes, h5=id_do_arquivo, h6=ultimo_pacote_recebido)
+                            break
                         print(f'payload {payload} {payload_len}')
                         if get_data(com1, 4) != EOP:
                             # pacote incompleto recebido
