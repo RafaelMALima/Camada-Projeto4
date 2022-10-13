@@ -34,6 +34,11 @@ def espera_resposta(com1, start_time, tamanho, esperando, tempo_espera):
             com1.rx.clearBuffer()
             print(rxBuffer)
             print(esperando)
+            with open('logs/client4.txt' , 'a') as f:
+                if int.from_bytes(rxBuffer[0:1], 'big') == 2:
+                    f.write(f"{time.asctime(time.localtime(time.time()))}/receb/ {int.from_bytes(rxBuffer[0:1], 'big')} / {14} \n")
+                else:
+                    f.write(f"{time.asctime(time.localtime(time.time()))}/receb/ {int.from_bytes(rxBuffer[0:1], 'big')} / {14 + int.from_bytes(rxBuffer[5:6], 'big')} \n")
             if rxBuffer == esperando:
                 print("A mensagem foi enviada com sucesso")
                 return True, rxBuffer
@@ -48,6 +53,9 @@ def handshake(com1, start_time, total_packs):
         txBuffer = b'\x11\x00\x00' + total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD'
         print(np.asarray(txBuffer))
         com1.sendData(np.asarray(txBuffer))
+        with open('logs/client4.txt', 'a') as f:
+            f.write(f"{time.asctime(time.localtime(time.time()))}/envia/ 1 / 14 \n")
+
         timer_handshake = time.process_time()
         print("Handshake enviado, esperando resposta")
         handshake_respondido, response = espera_resposta(com1, start_time, 14, b'\x02\x00\x00' +total_packs.to_bytes(1, 'big') + b'\x00\x11\x00\x00\x00\x00\xAA\xBB\xCC\xDD', 5)
@@ -105,6 +113,9 @@ def main():
             datagrama = monta_datagrama_conteudo(payloads[cont - 1], payloads, cont)
             print(f"datagrama:{datagrama}")
             com1.sendData(np.asarray(datagrama))
+            with open('logs/client4.txt', 'a') as f:
+                f.write(f"{time.asctime(time.localtime(time.time()))}/envia/ {int.from_bytes(datagrama[0:1], 'big')} / {14 + int.from_bytes(datagrama[5:6], 'big')} / {cont} / {len(payloads)}\n")
+
             timer1 = time.process_time()
             timer2 = time.process_time()
             esperando = b'\x04\x00\x00'+len(payloads).to_bytes(1,'big') + b'\x00\x00\x00' + cont.to_bytes(1,'big') + b'\x00'*2 +  b'\xAA\xBB\xCC\xDD'
@@ -125,11 +136,13 @@ def main():
                     print('ERRO 5 DO SERVIDOR, ENCERRANDO COMUNICACAO')
                     com1.disable()
                     quit()
-            if recebeu_resposta and resposta[:1] == b'\x00':
+            elif resposta[:1] == b'\x00':
                 header_fim = b'\x05' + b'\x00'*9
                 mensagem_encerramento = header_fim + b'\xAA\xBB\xCC\xDD'
                 com1.sendData(mensagem_encerramento)
                 print("TIMEOUT CRITICO, ENCERRANDO COMUNICACAO")
+                with open('logs/client4.txt', 'a') as f:
+                    f.write(f"{time.asctime(time.localtime(time.time()))}/envia/ {int.from_bytes(mensagem_encerramento[0:1], 'big')} / 14 \n")
                 com1.disable()
                 quit()
                 
